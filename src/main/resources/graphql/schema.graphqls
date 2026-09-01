@@ -1,0 +1,51 @@
+#In GraphQL, Query defines the read operations available to clients.
+#The schema is the contract
+#mapping between schema and Java:
+type Query {
+    order(id: ID!): Order
+    orders: [Order!]!
+
+    merchant(id: ID!): Merchant
+}
+
+#Mutation
+#   = changes state
+#
+#input
+#   = structured data sent by the client
+#
+#CreateOrderInput!
+#   = required input object
+type Mutation {
+    createOrder(input: CreateOrderInput!): Order!
+}
+
+#ID!        = ID cannot be null
+#Order      = may return an Order or null
+#[Order!]!  = list cannot be null, and items cannot be null
+type Order {
+    id: ID!
+    merchantReference: String!
+    amount: Float!
+    currency: String!
+    status: OrderStatus!
+}
+
+#We’ll introduce a Merchant that owns orders, then query both in one request.
+type Merchant {
+    id: ID!
+    name: String!
+    orders: [Order!]!
+}
+
+input CreateOrderInput {
+    merchantReference: String!
+    amount: Float!
+    currency: String!
+}
+
+enum OrderStatus {
+    PENDING
+    APPROVED
+    DECLINED
+}

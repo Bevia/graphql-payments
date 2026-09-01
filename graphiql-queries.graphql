@@ -1,0 +1,129 @@
+# GraphiQL examples for graphql-payments
+#
+# Open:
+# http://localhost:8080/graphiql?path=/api/graphql
+#
+# Each example is named so multiple operations can live in this file. In
+# GraphiQL, select the operation you want to execute. For operations that use
+# variables, copy the commented JSON example into GraphiQL's Variables panel.
+
+
+# 1. List every order and request all currently exposed fields.
+query ListOrders {
+    orders {
+        id
+        merchantReference
+        amount
+        currency
+        status
+    }
+}
+
+
+# 2. Find one order with an inline ID.
+# This also demonstrates that the client can request only selected fields.
+query GetOrderInline {
+    order(id: "1") {
+        merchantReference
+        status
+    }
+}
+
+
+# 3. Create an order with values written directly in the mutation.
+# The new order is assigned to merchant 1 and starts with PENDING status.
+mutation CreateOrderInline {
+    createOrder(
+        input: {
+            merchantReference: "ORDER-10003"
+            amount: 75.50
+            currency: "EUR"
+        }
+    ) {
+        id
+        merchantReference
+        amount
+        currency
+        status
+    }
+}
+
+
+# 4. Create an order using a variable.
+mutation CreateOrder($input: CreateOrderInput!) {
+    createOrder(input: $input) {
+        id
+        merchantReference
+        amount
+        currency
+        status
+    }
+}
+
+# Variables JSON for CreateOrder — paste into GraphiQL's Variables panel:
+# {
+#   "input": {
+#     "merchantReference": "ORDER-10004",
+#     "amount": 99.95,
+#     "currency": "EUR"
+#   }
+# }
+
+
+# 5. Find one order with a named query and variable.
+query FindOrder($id: ID!) {
+    order(id: $id) {
+        id
+        merchantReference
+        amount
+        currency
+        status
+    }
+}
+
+# Variables JSON for FindOrder — paste into GraphiQL's Variables panel:
+# {
+#   "id": "1"
+# }
+
+
+# 6. Resolve Merchant 1 and its nested orders.
+# The Merchant.orders @SchemaMapping filters orders whose merchantId is 1.
+query MerchantOneWithOrders {
+    merchant(id: "1") {
+        id
+        name
+        orders {
+            id
+            merchantReference
+            amount
+            currency
+            status
+        }
+    }
+}
+
+
+# 7. Resolve Merchant 2 and its nested orders.
+# The current in-memory data has no orders for this merchant, so orders is [].
+query MerchantTwoWithOrders {
+    merchant(id: "2") {
+        id
+        name
+        orders {
+            id
+            merchantReference
+        }
+    }
+}
+
+
+# 8. Request a merchant without requesting orders.
+# GraphQL does not invoke the Merchant.orders @SchemaMapping for this operation,
+# demonstrating lazy, field-by-field resolution.
+query MerchantWithoutOrdersField {
+    merchant(id: "1") {
+        id
+        name
+    }
+}
