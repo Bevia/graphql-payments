@@ -7,7 +7,7 @@ The project deliberately uses in-memory data for now. This keeps the focus on Gr
 ## Technology stack
 
 - Java 21
-- Maven
+- Gradle (via the Gradle Wrapper)
 - Spring Boot 4.1.x
 - Spring Web
 - Spring for GraphQL
@@ -48,8 +48,10 @@ New orders receive an incrementing ID, start with `PENDING` status, and are curr
 From the project root, start the application with:
 
 ```bash
-./mvnw spring-boot:run
+./gradlew bootRun
 ```
+
+Prefer the Gradle Wrapper (`./gradlew`) over a globally installed Gradle: it uses the Gradle version configured for this project, keeping builds consistent without requiring a separate Gradle installation.
 
 The GraphQL API is exposed at:
 
@@ -81,7 +83,10 @@ Because the data is held in memory, restarting the application restores the two 
 
 ```text
 graphql-payments/
-├── pom.xml
+├── build.gradle
+├── settings.gradle
+├── gradlew
+├── gradle/
 ├── README.md
 ├── graphiql-queries.graphql
 └── src/
