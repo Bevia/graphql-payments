@@ -41,7 +41,9 @@ type Merchant {
     orders: [Order!]!
 }
 
+#merchantId is optional: when omitted, the order goes to merchant 1.
 input CreateOrderInput {
+    merchantId: ID
     merchantReference: String!
     amount: Float!
     currency: String!

@@ -39,6 +39,7 @@ type Merchant {
 }
 
 input CreateOrderInput {
+    merchantId: ID
     merchantReference: String!
     amount: Float!
     currency: String!
@@ -75,7 +76,15 @@ Every field on `Query` and `Mutation` is matched by name to a controller method.
 
 `@Argument` binds GraphQL arguments to Java parameters and converts them: the GraphQL `ID` `"1"` becomes `Long 1`, and the `input` object becomes a `CreateOrderInput` record.
 
-`createOrder` always assigns the new order to merchant `1` with status `PENDING` (see `OrderService.create`).
+`createOrder` creates the order with status `PENDING` (see `OrderService.create`). The merchant comes from the optional `merchantId` input field:
+
+- Omitted → merchant `1` (so older clients that never send it keep working).
+- `1` or `2` → that merchant.
+- Anything else → `IllegalStateException` → `BAD_REQUEST` error `Merchant <id> does not exist`.
+
+Because `createOrder` returns `Order!` (non-null), a failed create also produces a second error, `NullValueInNonNullableField`, and `data` is `null`. GraphQL adds that error itself when a non-null field has no value.
+
+The valid merchant IDs live in two places for now: `MerchantController` (which returns them) and `OrderService.KNOWN_MERCHANT_IDS` (which validates them). Keep them in sync until merchants move to the database.
 
 `cancelOrder` never deletes data: payments systems keep orders for audit, reconciliation and disputes. The rule lives in the entity, `Order.cancel()`:
 

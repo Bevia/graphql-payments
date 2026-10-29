@@ -3,6 +3,7 @@ package org.corebaseit.graphqlpayments.order;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 /*
 Our architecture has now improved considerably:
@@ -27,6 +28,13 @@ H2
 @Service
 public class OrderService {
 
+    /*
+    Merchants are still hard-coded in MerchantController (1 and 2).
+    Until merchants move to the database, this list must match it.
+     */
+    private static final Long DEFAULT_MERCHANT_ID = 1L;
+    private static final Set<Long> KNOWN_MERCHANT_IDS = Set.of(1L, 2L);
+
     private final OrderRepository orderRepository;
 
     public OrderService(OrderRepository orderRepository) {
@@ -48,8 +56,16 @@ public class OrderService {
 
     public Order create(CreateOrderInput input) {
 
+        Long merchantId = input.merchantId() != null
+                ? input.merchantId()
+                : DEFAULT_MERCHANT_ID;
+
+        if (!KNOWN_MERCHANT_IDS.contains(merchantId)) {
+            throw new IllegalStateException("Merchant " + merchantId + " does not exist");
+        }
+
         Order order = new Order(
-                1L, // merchant for now
+                merchantId,
                 input.merchantReference(),
                 input.amount(),
                 input.currency(),

@@ -89,7 +89,7 @@ Each layer has one job and knows only about the layer below it:
 
 - **Spring for GraphQL** knows the schema. It parses and validates each request and decides which resolver to call for each field. It does not know where data comes from.
 - **Controllers** translate between GraphQL and the application. They take arguments, call the service, and return Java objects. They do not know about SQL or H2.
-- **The service** holds business rules, for example "new orders start as `PENDING` and belong to merchant 1". It does not know about GraphQL.
+- **The service** holds business rules, for example "new orders start as `PENDING`, and an unknown merchant is rejected". It does not know about GraphQL.
 - **The repository** hides how data is stored. `findByMerchantId` is just a method name; Spring Data turns it into a query.
 - **Hibernate and H2** handle tables, rows and SQL.
 

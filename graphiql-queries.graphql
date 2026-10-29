@@ -31,7 +31,7 @@ query GetOrderInline {
 
 
 # 3. Create an order with values written directly in the mutation.
-# The new order is assigned to merchant 1 and starts with PENDING status.
+# No merchantId is given, so the order goes to merchant 1. It starts with PENDING status.
 mutation CreateOrderInline {
     createOrder(
         input: {
@@ -88,7 +88,7 @@ query FindOrder($id: ID!) {
 
 
 # 6. Resolve Merchant 1 and its nested orders.
-# The Merchant.orders @SchemaMapping filters orders whose merchantId is 1.
+# The Merchant.orders @SchemaMapping loads the orders whose merchantId is 1 from H2.
 query MerchantOneWithOrders {
     merchant(id: "1") {
         id
@@ -146,3 +146,37 @@ mutation CancelOrder($id: ID!) {
 # {
 #   "id": "1"
 # }
+
+
+# 10. Create an order for Tech Store (merchant 2).
+# Without merchantId the order goes to merchant 1. An unknown merchantId (e.g. "3")
+# returns a BAD_REQUEST error "Merchant 3 does not exist".
+mutation CreateOrderForTechStore {
+    createOrder(
+        input: {
+            merchantId: "2"
+            merchantReference: "TS-1"
+            amount: 19.99
+            currency: "EUR"
+        }
+    ) {
+        id
+        merchantReference
+        status
+    }
+}
+
+
+# 11. Both merchants and their orders in one request, using aliases.
+# The same field (merchant) can appear twice only if each occurrence has an alias.
+# The aliases m1 and m2 become the keys in the response.
+query BothMerchants {
+    m1: merchant(id: "1") {
+        name
+        orders { id merchantReference }
+    }
+    m2: merchant(id: "2") {
+        name
+        orders { id merchantReference }
+    }
+}

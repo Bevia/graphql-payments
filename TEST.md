@@ -79,12 +79,13 @@ From the project root:
 
 Expected result: `BUILD SUCCESSFUL`.
 
-The suite currently has five tests:
+The suite currently has eight tests:
 
 | Test class | What it checks |
 |---|---|
 | `GraphqlPaymentsApplicationTests` | `contextLoads()` starts the full Spring context (GraphQL schema, JPA, H2). If the schema and the controllers disagree, or JPA mapping is broken, this test fails. |
 | `order.CancelOrderTests` | Runs the `cancelOrder` mutation through `GraphQlTester`: a `PENDING` order becomes `CANCELLED`, cancelling twice is harmless, an `APPROVED` order is rejected with a `BAD_REQUEST` error, and an unknown ID returns `null`. |
+| `order.CreateOrderTests` | Runs `createOrder`: an order with `merchantId: "2"` shows up under `merchant(id: "2") { orders }`, an order without `merchantId` goes to merchant `1`, and merchant `3` is rejected with `BAD_REQUEST`. |
 
 The HTML report is written to:
 
@@ -126,7 +127,7 @@ Merchants are hard-coded and always available:
 | `1` | Corebase Shop |
 | `2` | Tech Store |
 
-Every new order is assigned to merchant `1` and starts with status `PENDING`.
+Every new order starts with status `PENDING`. It belongs to the merchant given in the optional `merchantId` input field, or to merchant `1` if you leave it out (see section 5.2).
 
 ## 4. Test with GraphiQL
 
@@ -250,6 +251,36 @@ Only `PENDING` orders can be cancelled. Every order created through the API star
 
 If GraphiQL underlines `cancelOrder` in red, or the Docs panel doesn't list it under `Mutation`, the app is running old code. Restart it.
 
+**7. Create an order for Tech Store.** Add the optional `merchantId` to the input. Without it, the order goes to merchant `1` (Corebase Shop):
+
+```graphql
+mutation {
+  createOrder(input: { merchantId: "2", merchantReference: "TS-1", amount: 19.99, currency: "EUR" }) {
+    id
+    status
+  }
+}
+```
+
+An unknown merchant, such as `merchantId: "3"`, returns a `BAD_REQUEST` error: `Merchant 3 does not exist`.
+
+**8. See both merchants' orders in one request (aliases).** The same field can't appear twice in one query unless you give each occurrence a name. `m1:` and `m2:` are **aliases**, and they become the keys in the response:
+
+```graphql
+{
+  m1: merchant(id: "1") { name orders { id merchantReference } }
+  m2: merchant(id: "2") { name orders { id merchantReference } }
+}
+```
+
+Expected (after steps 1 and 7):
+
+```json
+{"data":{"m1":{"name":"Corebase Shop","orders":[{"id":"1","merchantReference":"ORDER-1"}]},"m2":{"name":"Tech Store","orders":[{"id":"2","merchantReference":"TS-1"}]}}}
+```
+
+The `order` and `orders` queries don't show which merchant an order belongs to, because `merchantId` isn't part of the `Order` type in the schema. Use `merchant { orders }` to see it.
+
 ### 4.3 Shortcuts
 
 | Shortcut | What it does |
@@ -316,6 +347,37 @@ Expected:
 {"data":{"createOrder":{"id":"1","merchantReference":"ORDER-10001","amount":49.95,"currency":"EUR","status":"PENDING"}}}
 ```
 
+Without `merchantId`, the order belongs to merchant `1` (Corebase Shop).
+
+#### Create an order for Tech Store (merchant 2)
+
+Add `merchantId` to the input:
+
+```bash
+curl -s -X POST http://localhost:8080/api/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"mutation { createOrder(input: {merchantId: \"2\", merchantReference: \"TS-1\", amount: 19.99, currency: \"EUR\"}) { id status } }"}'
+```
+
+In GraphiQL or Postman:
+
+```graphql
+mutation {
+  createOrder(input: { merchantId: "2", merchantReference: "TS-1", amount: 19.99, currency: "EUR" }) {
+    id
+    status
+  }
+}
+```
+
+The order now appears under `merchant(id: "2") { orders { ... } }`.
+
+| `merchantId` | Result |
+|---|---|
+| Omitted | Merchant `1` |
+| `"1"` or `"2"` | That merchant |
+| Anything else, e.g. `"3"` | `errors` with `classification: BAD_REQUEST` and message `Merchant 3 does not exist`, plus a second `NullValueInNonNullableField` error (because `createOrder` returns non-null `Order!`); `data` is `null` |
+
 ### 5.3 Find one order by ID
 
 ```bash
@@ -347,7 +409,7 @@ Expected:
 {"data":{"merchant":{"id":"1","name":"Corebase Shop","orders":[{"id":"1","merchantReference":"ORDER-10001"}]}}}
 ```
 
-Merchant `2` returns `"orders":[]`, because new orders are always assigned to merchant `1`.
+Merchant `2` returns `"orders":[]` until you create an order with `merchantId: "2"` (section 5.2).
 
 ### 5.5 Cancel an order
 
