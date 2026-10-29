@@ -46,4 +46,10 @@ public class OrderController {
     public Order createOrder(@Argument CreateOrderInput input) {
         return orderService.create(input);
     }
+
+    @MutationMapping
+    public Order cancelOrder(@Argument Long id) {
+        return orderService.cancel(id);
+    }
+
 }

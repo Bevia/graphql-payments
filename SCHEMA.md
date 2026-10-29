@@ -21,6 +21,7 @@ type Query {
 
 type Mutation {
     createOrder(input: CreateOrderInput!): Order!
+    cancelOrder(id: ID!): Order
 }
 
 type Order {
@@ -47,6 +48,7 @@ enum OrderStatus {
     PENDING
     APPROVED
     DECLINED
+    CANCELLED
 }
 ```
 
@@ -67,12 +69,22 @@ Every field on `Query` and `Mutation` is matched by name to a controller method.
 | `Query.orders` | `OrderController.orders()` `@QueryMapping` | `OrderService.findAll()` | `OrderRepository.findAll()` → H2 |
 | `Query.order(id)` | `OrderController.order(@Argument Long id)` `@QueryMapping` | `OrderService.findById(id)` | `OrderRepository.findById()` → H2 |
 | `Mutation.createOrder(input)` | `OrderController.createOrder(@Argument CreateOrderInput input)` `@MutationMapping` | `OrderService.create(input)` | `OrderRepository.save()` → H2 |
+| `Mutation.cancelOrder(id)` | `OrderController.cancelOrder(@Argument Long id)` `@MutationMapping` | `OrderService.cancel(id)` → `Order.cancel()` | `OrderRepository.findById()` + `save()` → H2 |
 | `Query.merchant(id)` | `MerchantController.merchant(@Argument Long id)` `@QueryMapping` | — | Hard-coded in the controller (no database) |
 | `Merchant.orders` | `MerchantController.orders(Merchant merchant)` `@SchemaMapping` | `OrderService.findByMerchantId(id)` | `OrderRepository.findByMerchantId()` → H2 |
 
 `@Argument` binds GraphQL arguments to Java parameters and converts them: the GraphQL `ID` `"1"` becomes `Long 1`, and the `input` object becomes a `CreateOrderInput` record.
 
 `createOrder` always assigns the new order to merchant `1` with status `PENDING` (see `OrderService.create`).
+
+`cancelOrder` never deletes data: payments systems keep orders for audit, reconciliation and disputes. The rule lives in the entity, `Order.cancel()`:
+
+- `PENDING` → `CANCELLED`.
+- Already `CANCELLED` → unchanged, so a retried request is safe (idempotent).
+- `APPROVED` or `DECLINED` → throws `IllegalStateException`. Undoing an approved payment is a void or refund, not a cancel.
+- Unknown ID → the mutation returns `null`, which is why its return type is the nullable `Order`.
+
+`GraphQlErrorHandler` (a `@ControllerAdvice` with a `@GraphQlExceptionHandler` method) turns that `IllegalStateException` into a GraphQL error with classification `BAD_REQUEST` and a readable message. Without it, Spring for GraphQL hides the message and returns a generic `INTERNAL_ERROR`.
 
 ## 3. Types → Java classes
 
@@ -117,7 +129,7 @@ flowchart TD
     Schema[("schema.graphqls")]
 
     subgraph GraphQL layer
-        OC["OrderController<br/>@QueryMapping orders, order<br/>@MutationMapping createOrder"]
+        OC["OrderController<br/>@QueryMapping orders, order<br/>@MutationMapping createOrder, cancelOrder"]
         MC["MerchantController<br/>@QueryMapping merchant<br/>@SchemaMapping Merchant.orders"]
     end
 
@@ -153,6 +165,7 @@ flowchart LR
         Q_orders["Query.orders"]
         Q_order["Query.order(id)"]
         M_create["Mutation.createOrder(input)"]
+        M_cancel["Mutation.cancelOrder(id)"]
         Q_merchant["Query.merchant(id)"]
         T_morders["Merchant.orders"]
         T_order["type Order"]
@@ -165,6 +178,7 @@ flowchart LR
         OC_orders["OrderController.orders()"]
         OC_order["OrderController.order()"]
         OC_create["OrderController.createOrder()"]
+        OC_cancel["OrderController.cancelOrder()"]
         MC_merchant["MerchantController.merchant()"]
         MC_orders["MerchantController.orders(Merchant)"]
         J_order["Order @Entity"]
@@ -176,6 +190,7 @@ flowchart LR
     Q_orders --> OC_orders
     Q_order --> OC_order
     M_create --> OC_create
+    M_cancel --> OC_cancel
     Q_merchant --> MC_merchant
     T_morders --> MC_orders
     T_order --> J_order

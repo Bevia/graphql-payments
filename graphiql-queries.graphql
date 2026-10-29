@@ -127,3 +127,22 @@ query MerchantWithoutOrdersField {
         name
     }
 }
+
+
+# 9. Cancel an order.
+# Orders are never deleted: a PENDING order becomes CANCELLED and the record is kept.
+# Cancelling an already CANCELLED order returns it unchanged.
+# An APPROVED or DECLINED order returns a BAD_REQUEST error.
+# An unknown ID returns null.
+mutation CancelOrder($id: ID!) {
+    cancelOrder(id: $id) {
+        id
+        merchantReference
+        status
+    }
+}
+
+# Variables JSON for CancelOrder — paste into GraphiQL's Variables panel:
+# {
+#   "id": "1"
+# }

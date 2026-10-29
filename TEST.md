@@ -79,7 +79,12 @@ From the project root:
 
 Expected result: `BUILD SUCCESSFUL`.
 
-The suite currently has one test, `GraphqlPaymentsApplicationTests.contextLoads()`, which starts the full Spring context (GraphQL schema, JPA, H2). If the schema and the controllers disagree, or JPA mapping is broken, this test fails.
+The suite currently has five tests:
+
+| Test class | What it checks |
+|---|---|
+| `GraphqlPaymentsApplicationTests` | `contextLoads()` starts the full Spring context (GraphQL schema, JPA, H2). If the schema and the controllers disagree, or JPA mapping is broken, this test fails. |
+| `order.CancelOrderTests` | Runs the `cancelOrder` mutation through `GraphQlTester`: a `PENDING` order becomes `CANCELLED`, cancelling twice is harmless, an `APPROVED` order is rejected with a `BAD_REQUEST` error, and an unknown ID returns `null`. |
 
 The HTML report is written to:
 
@@ -201,6 +206,50 @@ Then put this in the **Variables** tab at the bottom:
 }
 ```
 
+**6. Cancel an order.** Make sure order `1` exists (step 1), then clear the editor and paste:
+
+```graphql
+mutation {
+  cancelOrder(id: "1") {
+    id
+    merchantReference
+    status
+  }
+}
+```
+
+Press ▶. Expected:
+
+```json
+{"data":{"cancelOrder":{"id":"1","merchantReference":"ORDER-1","status":"CANCELLED"}}}
+```
+
+Then try the other cases:
+
+| Try this | Expected |
+|---|---|
+| Run the same mutation again | Same response, still `CANCELLED` (retries are safe) |
+| `cancelOrder(id: "999")` | `{"data":{"cancelOrder":null}}`: the order doesn't exist |
+| Run the step 2 `orders` query | Order `1` is still listed, with status `CANCELLED`. Cancelling never deletes |
+
+To pass the ID as a variable instead:
+
+```graphql
+mutation CancelOrder($id: ID!) {
+  cancelOrder(id: $id) { id status }
+}
+```
+
+**Variables** tab:
+
+```json
+{ "id": "1" }
+```
+
+Only `PENDING` orders can be cancelled. Every order created through the API starts as `PENDING`, so from GraphiQL you'll always see the success case. The `APPROVED`/`DECLINED` rejection is covered by the automated tests (see section 5.5).
+
+If GraphiQL underlines `cancelOrder` in red, or the Docs panel doesn't list it under `Mutation`, the app is running old code. Restart it.
+
 ### 4.3 Shortcuts
 
 | Shortcut | What it does |
@@ -216,7 +265,7 @@ Red underlines are schema validation errors, such as an unknown field or a missi
 ### 4.4 Running the saved examples
 
 1. Paste the whole of [`graphiql-queries.graphql`](graphiql-queries.graphql) into the editor.
-2. For operations that use variables (`CreateOrder`, `FindOrder`), copy the JSON shown in the comments into the **Variables** tab.
+2. For operations that use variables (`CreateOrder`, `FindOrder`, `CancelOrder`), copy the JSON shown in the comments into the **Variables** tab.
 3. Because the file holds several named operations, ▶ asks which one to run. You can also place the cursor inside an operation and press `Cmd+Enter` to run just that one.
 
 Because the database starts empty, run the operations in this order:
@@ -228,6 +277,7 @@ Because the database starts empty, run the operations in this order:
 5. `MerchantOneWithOrders` → merchant 1 with both orders
 6. `MerchantTwoWithOrders` → merchant 2 with `orders: []`
 7. `MerchantWithoutOrdersField` → merchant 1 only; the `Merchant.orders` resolver is not called
+8. `CancelOrder` with `{ "id": "1" }` → order `1` becomes `CANCELLED`
 
 > The comments in `graphiql-queries.graphql` still describe the old in-memory data (two pre-loaded orders). With H2, those orders no longer exist until you create them.
 
@@ -299,7 +349,34 @@ Expected:
 
 Merchant `2` returns `"orders":[]`, because new orders are always assigned to merchant `1`.
 
-### 5.5 Edge cases worth checking
+### 5.5 Cancel an order
+
+Orders are never deleted; cancelling sets the status to `CANCELLED` and keeps the record.
+
+```bash
+curl -s -X POST http://localhost:8080/api/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"mutation { cancelOrder(id: \"1\") { id status } }"}'
+```
+
+Expected:
+
+```json
+{"data":{"cancelOrder":{"id":"1","status":"CANCELLED"}}}
+```
+
+Rules:
+
+| Current status | Result |
+|---|---|
+| `PENDING` | Becomes `CANCELLED` |
+| `CANCELLED` | Returned unchanged, so retrying is safe |
+| `APPROVED` or `DECLINED` | `errors` array with `classification: BAD_REQUEST` and the message `Order <id> cannot be cancelled because its status is <status>` |
+| Order does not exist | `{"data":{"cancelOrder":null}}` |
+
+Every order created through the API starts as `PENDING`, and nothing in the API sets `APPROVED` or `DECLINED` yet, so the rejection case is covered only by `CancelOrderTests`.
+
+### 5.6 Edge cases worth checking
 
 | Scenario | Request | Expected response |
 |---|---|---|

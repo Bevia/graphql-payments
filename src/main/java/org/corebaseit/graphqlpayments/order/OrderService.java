@@ -58,4 +58,18 @@ public class OrderService {
 
         return orderRepository.save(order);
     }
+
+    public Order cancel(Long id) {
+
+        Order order = orderRepository.findById(id)
+                .orElse(null);
+
+        if (order == null) {
+            return null;
+        }
+
+        order.cancel();
+
+        return orderRepository.save(order);
+    }
 }

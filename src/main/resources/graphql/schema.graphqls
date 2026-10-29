@@ -16,8 +16,11 @@ type Query {
 #
 #CreateOrderInput!
 #   = required input object
+#cancelOrder returns null when the order does not exist.
+#Only PENDING orders can be cancelled; we keep the record instead of deleting it.
 type Mutation {
     createOrder(input: CreateOrderInput!): Order!
+    cancelOrder(id: ID!): Order
 }
 
 #ID!        = ID cannot be null
@@ -48,4 +51,5 @@ enum OrderStatus {
     PENDING
     APPROVED
     DECLINED
+    CANCELLED
 }

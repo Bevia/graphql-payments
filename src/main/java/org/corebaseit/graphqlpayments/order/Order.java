@@ -64,4 +64,24 @@ public class Order {
     public OrderStatus getStatus() {
         return status;
     }
+
+    /*
+    Only a PENDING order can be cancelled.
+    Cancelling an already CANCELLED order changes nothing, so retries are safe.
+    APPROVED or DECLINED orders cannot be cancelled:
+    undoing an approved payment is a void or refund, not a cancel.
+     */
+    public void cancel() {
+        if (status == OrderStatus.CANCELLED) {
+            return;
+        }
+
+        if (status != OrderStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Order " + id + " cannot be cancelled because its status is " + status
+            );
+        }
+
+        status = OrderStatus.CANCELLED;
+    }
 }
