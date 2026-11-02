@@ -395,3 +395,8 @@ nested fields
     → JPA and PostgreSQL
 ```
 
+---
+
+if error when running:
+lsof -ti tcp:8080 | xargs kill
+
